@@ -2,7 +2,7 @@
 vagrant code and ansible playbooks to deploy a multi-node kubernetes cluster
 
 ## Requirements:
-- vagrant
+- [vagrant](https://www.vagrantup.com/downloads.html)
 
 ## Howto:
 - Clone this repo
