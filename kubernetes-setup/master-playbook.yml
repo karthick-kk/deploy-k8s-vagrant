@@ -1,0 +1,120 @@
+---
+- hosts: all
+  become: true
+  tasks:
+  - name: Install packages that allow apt to be used over HTTPS
+    apt:
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg-agent
+      - software-properties-common
+
+  - name: Install docker and its dependecies
+    apt: 
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+      - docker.io
+    notify:
+      - docker status
+
+  - name: Add vagrant user to docker group
+    user:
+      name: vagrant
+      group: docker
+
+  - name: Remove swapfile from /etc/fstab
+    mount:
+      name: "{{ item }}"
+      fstype: swap
+      state: absent
+    with_items:
+      - swap
+      - none
+
+  - name: Disable swap
+    command: swapoff -a
+    when: ansible_swaptotal_mb > 0
+
+  - name: Add an apt signing key for Kubernetes
+    apt_key:
+      url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      state: present
+
+  - name: Adding apt repository for Kubernetes
+    apt_repository:
+      repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+      filename: kubernetes.list
+
+  - name: Install Kubernetes binaries
+    apt: 
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+        - kubelet 
+        - kubeadm 
+        - kubectl
+
+
+  - name: Check if Kubernetes has already been initialized.
+    stat:
+      path: /etc/kubernetes/admin.conf
+    register: kubernetes_init_stat
+
+  - name: Initialize the Kubernetes cluster using kubeadm
+    command: kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address="192.168.50.10" --ignore-preflight-errors="all"
+    register: kubeadmin_init
+    failed_when: false
+    when: kubernetes_init_stat.stat.exists == false
+
+  - name: Print the init output to screen.
+    debug:
+      var: kubeadmin_init.stdout
+      verbosity: 2
+    when: kubernetes_init_stat.stat.exists == false
+
+
+  - name: Ensure .kube directory exists.
+    file:
+      path: /home/vagrant/.kube
+      state: directory
+    become: false
+
+  - name: Symlink the kubectl admin.conf to ~/.kube/conf.
+    file:
+      src: /etc/kubernetes/admin.conf
+      dest: /home/vagrant/.kube/config
+      state: link
+      owner: vagrant
+      group: vagrant
+    become: true
+
+  - name: Install flannel pod network
+    become: false
+    command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+    register: flannel_result
+    changed_when: "'created' in flannel_result.stdout"
+
+  - name: Generate join command
+    shell: kubeadm token create --print-join-command 2>/dev/null
+    register: join_command
+
+  - name: Copy join command to local file
+    local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="/vagrant/join-command"
+    become: true
+
+  handlers:
+    - name: docker status
+      service: name=docker state=started
+
