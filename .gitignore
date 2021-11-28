@@ -1,0 +1,4 @@
+.DS_Store
+.vagrant/
+join-command
+node-playbook.retry
