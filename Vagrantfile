@@ -3,6 +3,7 @@ N = 2
 
 Vagrant.configure("2") do |config|
     config.ssh.insert_key = false
+    config.vm.boot_timeout = 400
     config.vm.synced_folder ".", "/vagrant", disabled: false
     config.vm.provider "virtualbox" do |v|
         v.memory = 2048

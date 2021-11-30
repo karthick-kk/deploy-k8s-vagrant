@@ -93,8 +93,8 @@
       path: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
       line: Environment="KUBELET_EXTRA_ARGS=--node-ip={{ output.stdout }}"
 
-  - name: Copy the join command to server location
-    copy: src=/vagrant/join-command dest=/tmp/join-command.sh mode=0777
+#  - name: Copy the join command to server location
+#    copy: src=/vagrant/join-command dest=/tmp/join-command.sh mode=0777
 
   - name: Join the node to cluster
-    command: sh /tmp/join-command.sh
+    command: sh /tmp/join-command
